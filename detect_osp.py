@@ -7,7 +7,7 @@ from ultralytics import YOLO
 model = YOLO("yolov11m.pt")
 cap = cv2.VideoCapture("your_video.mp4")
 fps = cap.get(cv2.CAP_PROP_FPS)
-frame_time = 1/fps
+frame_time = 4/fps
 
 # class initialize_osp(model):
 #     def initializeYOLO():
