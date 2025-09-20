@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 import time
+import supervision as sv
 
 from ultralytics import YOLO
 
@@ -13,6 +14,7 @@ frame_time = 4/fps
 #     def initializeYOLO():
 #         # test
 
+'''
 class calculate_osp():
     def calculateVelocity():
         while cap.isOpened():
@@ -50,3 +52,67 @@ class calculate_osp():
 
         cap.release()
         cv2.destroyAllWindows()
+'''
+
+def main():
+    # Input video title (within path)
+    print("Input driving video name (without .mp4): ")
+    video_name = input()
+    video_path = "video/" + video_name + ".mp4"
+
+    # Best model weight run
+    model_path = "runs/detect/train/weights/best.pt"
+
+    model = YOLO(model_path)
+
+    tracker = sv.ByteTrack()
+
+    box_annotator = sv.BoxAnnotator(
+        thickness=2,
+        text_thickness=1,
+        text_scale=0.5
+    )
+
+    cap = cv2.VideoCapture(video_path)
+
+    if not cap.isOpened():
+        print("Error: Could not open video.")
+        return
+    
+    while cap.isOpened():
+        ret, frame = cap.read()
+
+        if not ret:
+            break
+
+        result = model(frame, classes=[2], verbose=False)[0]
+
+        # change results to 
+        detections = sv.Detections.from_ultralytics(result)
+
+        # confidence of detections
+        detections = tracker.update_with_detections(detections)
+
+        labels = [
+            f"ID:{tracker_id}"
+            for tracker_id
+            in detections
+        ]
+        
+        annotated_frame = box_annotator.annotate(
+            scene=frame.copy(),
+            detections=detections,
+            labels=labels
+        )
+
+        cv2.imshow("On-Street Parking Detection", annotated_frame)
+
+        # Press 'q' to quit running the program by breaking the loop
+        if cv2.waitKey(1) & 0xFF == ord("q"):
+            break
+            
+    cap.release()
+    cv2.destroyAllWindows()
+
+if __name__ == "__main__":
+    main()

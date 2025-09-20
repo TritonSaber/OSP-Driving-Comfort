@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 7
+names: ['bike', 'bus', 'car', 'jeepney', 'motorcycle', 'tricycle', 'truck']
+
+roboflow:
+  workspace: my-workspace-wvghr
+  project: -no-peds-driving-comfort-detection
+  version: 1
+  license: MIT
+  url: https://universe.roboflow.com/my-workspace-wvghr/-no-peds-driving-comfort-detection/dataset/1
