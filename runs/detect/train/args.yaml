@@ -4,16 +4,16 @@ model: yolo11m.pt
 data: C:\Users\Justine\Documents\GitHub\OSP-Driving-Comfort\(No-Peds)-Driving-Comfort-Detection-1/data.yaml
 epochs: 100
 time: null
-patience: 10
-batch: 16
+patience: 100
+batch: 8
 imgsz: 640
 save: true
 save_period: -1
 cache: false
-device: cpu
-workers: 8
+device: '0'
+workers: 2
 project: null
-name: train
+name: train4
 exist_ok: false
 pretrained: true
 optimizer: auto
@@ -103,4 +103,4 @@ auto_augment: randaugment
 erasing: 0.4
 cfg: null
 tracker: botsort.yaml
-save_dir: C:\Users\Justine\Documents\GitHub\OSP-Driving-Comfort\runs\detect\train
+save_dir: C:\Users\Justine\Documents\GitHub\OSP-Driving-Comfort\runs\detect\train4

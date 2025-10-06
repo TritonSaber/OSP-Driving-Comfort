@@ -1,77 +1,30 @@
-import cv2
+import cv2 # OpenCV
 import numpy as np
 import time
 import supervision as sv
 
 from ultralytics import YOLO
 
-model = YOLO("yolov11m.pt")
-cap = cv2.VideoCapture("your_video.mp4")
-fps = cap.get(cv2.CAP_PROP_FPS)
-frame_time = 4/fps
-
-# class initialize_osp(model):
-#     def initializeYOLO():
-#         # test
-
-'''
-class calculate_osp():
-    def calculateVelocity():
-        while cap.isOpened():
-            trackers = {}
-
-            ret, frame = cap.read()
-            if not ret:
-                break
-
-            results = model.track(frame, persist=True, tracker="botsort.yaml")
-
-            if results and results[0].boxes.id is not None:
-                ids = results[0].boxes.id.cpu().numpy()
-                positions = results[0].boxes.xywh.cpu.numpy()
-
-                for obj_id, pos in zip(ids, positions):
-                    center_x, center_y = pos[0], pos[1]
-                    current_time = time.time()
-
-                    if obj_id in trackers:
-                        prev_pos, prev_time = trackers[obj_id]
-                        dx = center_x - prev_pos[0]
-                        dy = center_y - prev_pos[1]
-                        pixel_distance = np.sqrt(dx**2 + dy**2)
-                        elapsed_time = current_time - prev_time
-                        velocity = pixel_distance / elapsed_time
-
-                trackers[obj_id] = ((center_x,center_y), current_time)
-
-
-                cv2.imshow('Parking Detection', frame)
-
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                break
-
-        cap.release()
-        cv2.destroyAllWindows()
-'''
-
 def main():
     # Input video title (within path)
     print("Input driving video name (without .mp4): ")
     video_name = input()
-    video_path = "video/" + video_name + ".mp4"
+    video_path = "videos/" + video_name + ".mp4"
 
-    # Best model weight run
-    model_path = "runs/detect/train/weights/best.pt"
+    print("Playing: " + video_path)
 
-    model = YOLO(model_path)
+    # Best model training run weights
+    model = YOLO("runs/detect/train/weights/best.pt")
 
     tracker = sv.ByteTrack()
 
+    # Bounding box annotation
     box_annotator = sv.BoxAnnotator(
-        thickness=2,
-        text_thickness=1,
-        text_scale=0.5
+        thickness=2
     )
+
+    # Label annotation
+    label_annotator=sv.LabelAnnotator()
 
     cap = cv2.VideoCapture(video_path)
 
@@ -81,33 +34,49 @@ def main():
     
     while cap.isOpened():
         ret, frame = cap.read()
-
         if not ret:
+            # If there are no more frames (video has ended)
             break
 
-        result = model(frame, classes=[2], verbose=False)[0]
+        result = model(frame, verbose=False)[0]
 
-        # change results to 
+        # Load in predictions to Supervision, specifically Ultralytics because inference model comes from there
         detections = sv.Detections.from_ultralytics(result)
 
-        # confidence of detections
+        # Load in detection result to ByteTrack
         detections = tracker.update_with_detections(detections)
 
-        labels = [
-            f"ID:{tracker_id}"
-            for tracker_id
-            in detections
-        ]
+        # Removes frames without tracker ID
+        if detections.tracker_id.any():
+            mask = [tracker_id is not None for tracker_id in detections.tracker_id]
+            detections = detections[(detections.confidence > 0.5) & mask]
         
-        annotated_frame = box_annotator.annotate(
-            scene=frame.copy(),
-            detections=detections,
-            labels=labels
-        )
+        # Proceed only if there are detections left after filtering
+        if detections.xyxy.shape[0] > 0:
+            labels = [
+                f"TID:{tracker_id} CID:{class_id} {class_name} {confidence:0.2f}"
+                for tracker_id, class_id, class_name, confidence
+                in zip(detections.tracker_id, detections.class_id, detections['class_name'], detections.confidence)
+            ]
+            
+            annotated_frame = box_annotator.annotate(
+                scene=frame.copy(),
+                detections=detections
+            )
 
-        cv2.imshow("On-Street Parking Detection", annotated_frame)
+            annotated_frame = label_annotator.annotate(
+                scene=annotated_frame,
+                detections=detections,
+                labels=labels
+            )
+            # Show annotated frame using bounding boxes and labels
+            cv2.imshow("On-Street Parking Detection", annotated_frame)
+        
+        else:
+            # Otherwise, show the original frame in a different window if there are no detections
+            cv2.imshow("On-Street Parking Detection", frame)
 
-        # Press 'q' to quit running the program by breaking the loop
+        # Press 'q' to quit
         if cv2.waitKey(1) & 0xFF == ord("q"):
             break
             

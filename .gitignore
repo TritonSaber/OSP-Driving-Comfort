@@ -172,3 +172,11 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+# Runs folders
+runs/detect/train_large
+runs/detect/train_nano
+runs/detect/train_small
+
+# Test Python file
+# test.py
