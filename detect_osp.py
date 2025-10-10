@@ -16,7 +16,9 @@ def main():
     # Best model training run weights
     model = YOLO("runs/detect/train/weights/best.pt")
 
-    tracker = sv.ByteTrack()
+    video_info = sv.VideoInfo.from_video_path(video_path)
+    tracker = sv.ByteTrack(frame_rate=video_info.fps)
+    smoother = sv.DetectionsSmoother()
 
     # Bounding box annotation
     box_annotator = sv.BoxAnnotator(
@@ -45,6 +47,7 @@ def main():
 
         # Load in detection result to ByteTrack
         detections = tracker.update_with_detections(detections)
+        detections = smoother.update_with_detections(detections)
 
         # Removes frames without tracker ID
         if detections.tracker_id.any():

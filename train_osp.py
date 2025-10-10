@@ -1,10 +1,15 @@
 import ultralytics
 import torch
-from roboflow import Roboflow
+import os
 
+from roboflow import Roboflow
+from dotenv import load_dotenv
 from ultralytics import YOLO
 
 def main():
+    # Load .env
+    load_dotenv(".env")
+
     # This checks if ultralytics (and YOLO) is working
     ultralytics.checks()
 
@@ -12,12 +17,12 @@ def main():
     torch.cuda.is_available()
 
     # The Driving Comfort dataset, version 1 of the dataset with no pedestrian label
-    rf = Roboflow(api_key="IxXkXChvKvzhRnqjmm23")
-    project = rf.workspace("my-workspace-wvghr").project("-no-peds-driving-comfort-detection")
-    version = project.version(1)
-    dataset = version.download("yolov11")
+    rf = Roboflow(api_key=os.getenv("ROBOFLOW_API_KEY"))
+    project = rf.workspace(os.getenv("ROBOFLOW_WORKSPACE")).project(os.getenv("ROBOFLOW_PROJECT"))
+    version = project.version(os.getenv("ROBOFLOW_VERSION"))
+    dataset = version.download(os.getenv("ROBOFLOW_YOLO_VERSION"))
 
-    model = YOLO('yolo11s.pt')
+    model = YOLO('yolo11m.pt')
 
     print(model.names)
 
