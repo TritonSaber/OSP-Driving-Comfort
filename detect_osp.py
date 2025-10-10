@@ -49,14 +49,14 @@ def main():
         # Removes frames without tracker ID
         if detections.tracker_id.any():
             mask = [tracker_id is not None for tracker_id in detections.tracker_id]
-            detections = detections[(detections.confidence > 0.5) & mask]
+            detections = detections[(detections.confidence > 0.3) & mask]
         
         # Proceed only if there are detections left after filtering
         if detections.xyxy.shape[0] > 0:
             labels = [
-                f"TID:{tracker_id} CID:{class_id} {class_name} {confidence:0.2f}"
-                for tracker_id, class_id, class_name, confidence
-                in zip(detections.tracker_id, detections.class_id, detections['class_name'], detections.confidence)
+                f"{tracker_id} {class_name} {confidence:0.2f}"
+                for tracker_id, class_name, confidence
+                in zip(detections.tracker_id, detections['class_name'], detections.confidence)
             ]
             
             annotated_frame = box_annotator.annotate(
