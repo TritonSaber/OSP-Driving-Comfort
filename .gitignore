@@ -177,7 +177,9 @@ cython_debug/
 runs/detect/train_large
 runs/detect/train_nano
 runs/detect/train_small
+test
 
 # Large files
 yolo11l.pt
 /videos
+test.py
