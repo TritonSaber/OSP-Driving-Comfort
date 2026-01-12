@@ -146,7 +146,8 @@ def main():
                 labels=labels
             )
 
-             # Show annotated frame using bounding boxes and labels
+            # Show annotated frame using bounding boxes and labels
+            annotated_frame = cv2.add(annotated_frame, mask)
             cv2.imshow("On-Street Parking Detection", annotated_frame)
 
         else:
