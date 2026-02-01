@@ -11,7 +11,7 @@ def main():
     # video_name = input()
     # video_path = "videos/" + video_name + ".mp4"
 
-    # TEMP: Just to make things quick
+    # TEMP: Just to make things quick since there is only one video
     video_path = "videos/makati_city_hall.mp4"
 
 
@@ -66,6 +66,7 @@ def main():
 
     car_consistency = {}
     car_vectors_map = {} # temp bucket for optical flow arrows by Car ID for current frame
+    car_vectors_smoother = {}
     if 'car_status_memory' not in locals(): car_status_memory = {} # save car status, whether stopped, moving, or neither
 
     while cap.isOpened():
@@ -126,7 +127,7 @@ def main():
                     c, d = old.ravel().astype(int)
                     motion_vector = new - old
                     
-                    # MAGNITUDE CHECK (Filter glitches)
+                    # Filter any glitches within magnitude
                     if np.linalg.norm(motion_vector) > 100: continue 
 
                     # CHECK: Is this point inside a Car Box?
@@ -137,7 +138,7 @@ def main():
                             x1, y1, x2, y2 = box
                             tracker_id = detections.tracker_id[j]
                             
-                            # If point is inside this car's box
+                            # If there is a point inside the bounding box, apply indication that the point inside the car using car_vectors_map
                             if x1 < a < x2 and y1 < b < y2:
                                 # DEBUG: Print one example to check the scale
                                 # if i == 0 and len(detections) > 0:
@@ -146,7 +147,8 @@ def main():
                                 #     print(f"Box:   ({x1:.1f}, {y1:.1f}) to ({x2:.1f}, {y2:.1f})")
                                 #     print(f"Is Inside? {x1 < a < x2 and y1 < b < y2}")
                                 #     print(f"-------------------------")
-                                    
+                                
+                                # car_vectors_map append
                                 car_vectors_map[tracker_id].append(motion_vector)
                                 point_on_car = True
                                 # mask = cv2.line(mask, (a, b), (c, d), (0, 255, 0), 1)
@@ -158,11 +160,10 @@ def main():
                                 #     print(f"  Box: {x1}, {y1}, {x2}, {y2} (Type: {type(x1)})")
                                 break
                     
-                    # If NOT on a car, it's Background
+                    # If the point is NOT on a car, it is a regular point placed in the background
                     if not point_on_car:
                         background_vectors.append(motion_vector)
-                        # mask = cv2.line(mask, (a, b), (c, d), (0, 255, 0), 1)
-                        # Visual: Draw GREEN dot for background points
+                        # mask = cv2.line(mask, (a, b), (c, d), (0, 255, 0), 1) # just to show lines for the point
                         cv2.circle(frame, (a, b), 3, (0, 255, 0), -1)
 
                 # Draw the Arrow
@@ -180,14 +181,13 @@ def main():
         if len(background_vectors) > 0:
             global_motion_vector = np.median(background_vectors, axis=0)
 
-        # Draw Global Arrow
+        # Global motion
         h, w = frame.shape[:2]
         cv2.arrowedLine(frame, (w//2, h//2), 
                        (int(w/2 + global_motion_vector[0]*5), int(h/2 + global_motion_vector[1]*5)), 
                        (0, 0, 255), 3, tipLength=0.3)
 
-        status_labels = []
-        labels = []
+        status_labels = [] # the final label for the bounding box (using label annotator)
 
         # Proceed only if there are detections left after filtering
         if detections.xyxy.shape[0] > 0:
@@ -195,54 +195,21 @@ def main():
                 tracker_id = detections.tracker_id[i]
                 bbox = detections.xyxy[i]
 
-                my_vectors = car_vectors_map.get(tracker_id, [])
-                
-                """
-                # --- DEBUG VISUALIZATION START ---
-            
-                # 1. Draw the Car's Motion Vector (Blue Arrow)
-                # This lets you compare it visually to the Big Red Global Arrow
-                start_pt = (int(cx), int(cy))
-                # Scale up by 3 so we can see it clearly
-                end_pt = (int(cx + avg_car_vector[0]*3), int(cy + avg_car_vector[1]*3))
-                cv2.arrowedLine(frame, start_pt, end_pt, (255, 255, 0), 2, tipLength=0.3)
-
-                # 2. Print the MATH on the screen
-                # Format: "Diff vs Threshold"
-                # If Diff (5.0) < Thresh (8.0), it stays Parked. You need to see this!
-                debug_text = f"D:{diff:.1f} / T:{dynamic_threshold:.1f}"
-                cv2.putText(frame, debug_text, (int(bbox[0]), int(bbox[1])-10), 
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
-            
-                # --- DEBUG VISUALIZATION END ---
-                """
+                my_vectors = car_vectors_map.get(tracker_id, []) # my_vectors - any vector within a bounding box
 
                 if len(my_vectors) < 3:
-                    # Not enough points on this car to decide (Too far or smooth)
-                    # Fallback: Assume PARKED or keep previous state
-                    # status = "NONE"
-                    # avg_car_vector = np.array([0.0, 0.0])
-
-                    # IF car_consistency[tracker_id] it will return error KeyError: np.int64(2)
-                    current_score = car_consistency.get(tracker_id, 0)
-
-                    if current_score > 4:
-                        status = "ACTIVE"
-                    else:
-                        status = "STOPPED"
+                    # Vehicle cannot be detected properly, do not put any status
+                    status = "NONE"
+                    avg_car_vector = np.array([0.0, 0.0])
                 else:
-                    # Calculate Car Arrow
+                    # avg_car_vector via the median
                     avg_car_vector = np.median(my_vectors, axis=0)
                     
-                    # --- THE COMPARISON (Apples to Apples) ---
-                    # Now we compare two Optical Flow vectors. 
-                    # If the car is STOPPED, these vectors should be nearly IDENTICAL.
-                    
+                    # start of optical flow comparison
                     diff_vector = avg_car_vector - global_motion_vector
                     magnitude_diff = np.linalg.norm(diff_vector)
                     
-                    # Dynamic Threshold logic (Simplified)
-                    # If the camera is moving fast (high global speed), we allow more error
+                    # dynamic threshold - allowing more leeway if 
                     global_speed = np.linalg.norm(global_motion_vector)
                     threshold = 1.5 + (global_speed * 0.5)
                     
@@ -257,7 +224,9 @@ def main():
                     car_consistency[tracker_id] = max(-5, min(10, car_consistency[tracker_id]))
                     previous_status = car_status_memory.get(tracker_id, "NONE")
 
-                    # HYSTERESIS CHECK
+                    # Hysteresis check - checks for status of vehicle, in between 0 and 4
+                    # would allow for box to not immediately bounce from one status to another too quickly
+                    # previous_status would be the fallback if that happens
                     if car_consistency[tracker_id] >= 4:
                         status = "ACTIVE"
                     elif car_consistency[tracker_id] <= 0:
@@ -265,9 +234,10 @@ def main():
                     else:
                         status = previous_status
                     
+                    # update car status
                     car_status_memory[tracker_id] = status
 
-                    # DEBUG FOR CHECKING car_consistency
+                    # DEBUG FOR CHECKING car_consistency 
                     mov_track = car_consistency[tracker_id]
 
                     # VISUAL DEBUG: Draw the Car Arrow (Blue)
@@ -285,7 +255,7 @@ def main():
                 class_id = detections.class_id[i]
                 class_name = model.names[class_id]
                 
-
+                # final label - class name, confidence for box, status (STOPPED, ACTIVE, etc.), car consistency (TEMPORARY)
                 final_label = f"{class_name} {conf:.2f} {status} {mov_track}"
                 status_labels.append(final_label)
 
