@@ -22,6 +22,7 @@ def main():
     version = project.version(os.getenv("ROBOFLOW_VERSION"))
     dataset = version.download(os.getenv("ROBOFLOW_YOLO_VERSION"))
 
+    # Mainly loading YOLO11m for training, alternatively can load YOLO11n and YOLO11s for faster training
     model = YOLO('yolo11m.pt')
 
     print(model.names)
