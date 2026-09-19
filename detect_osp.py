@@ -23,7 +23,8 @@ def main():
     print("Playing: " + video_path)
 
     # Best model training run weights
-    model = YOLO("runs/detect/train/weights/best.pt")
+    # train3 houses YOLO26 trained data
+    model = YOLO("runs/detect/train3/weights/best.pt")
 
     """
     # model = YOLO("yolo11m.pt")
