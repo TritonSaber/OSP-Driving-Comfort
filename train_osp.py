@@ -22,12 +22,13 @@ def main():
     version = project.version(os.getenv("ROBOFLOW_VERSION"))
     dataset = version.download(os.getenv("ROBOFLOW_YOLO_VERSION"))
 
-    # Mainly loading YOLO11m for training, alternatively can load YOLO11n and YOLO11s for faster training
-    model = YOLO('yolo11m.pt')
+    # Mainly loading YOLO26m for training, alternatively can load YOLO26n and YOLO26s for faster training
+    # Originally YOLO11m was used for training, but YOLO26m is the latest version of YOLO and has better performance
+    model = YOLO('yolo26m.pt')
 
     print(model.names)
 
-    
+    # Change data to COCO if needed
     train_results = model.train(
         data=f'{dataset.location}/data.yaml',
         epochs=100,

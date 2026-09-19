@@ -79,7 +79,7 @@ def main():
     scale_factor = 25
 
     while cap.isOpened():
-        car_vectors_map = defaultdict(list) # reset for each frame, to store motion vectors for each car ID
+        car_vectors_map = {} # reset for each frame, to store motion vectors for each car ID
         ret, frame = cap.read()
         if not ret:
             # If there are no more frames (video has ended)
@@ -104,6 +104,10 @@ def main():
         frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     
         background_vectors = []
+
+        view_height, view_width = frame_gray.shape
+        vanishing_point_x = view_width // 2
+        vanishing_point_y = view_height * 0.4
 
         """
         # if detections.xyxy.shape[0] > 0:
@@ -136,8 +140,6 @@ def main():
                 src_pts = []
                 dst_pts = []
 
-                view_height, view_width = frame_gray.shape
-
                 for i, (new, old) in enumerate(zip(good_next, good_prev)):
                     # new from good_next are points from new frame
                     # old from good_prev are points from old frame
@@ -146,16 +148,16 @@ def main():
                     c, d = old.ravel().astype(int)
                     motion_vector = new - old
 
-                    # /// VISUAL: Draw a larger box so you see what is being tracked
-                    # We are now tracking the "Middle Band" of the image
+                    """# /// VISUAL: Draw a larger box so you see what is being tracked
+                    # We are now tracking the "Middle Band" of the image"""
                     cv2.rectangle(frame, (0, int(view_height*0.15)), (view_width, int(view_height*0.9)), (0, 255, 0), 1)
 
-                    if b < (view_height * 0.15) or b > (view_height * 0.90): continue
+                    if b < (view_height * 0.15) or b > (view_height * 0.85): continue
                     
                     # Filter any glitches within magnitude
                     if np.linalg.norm(motion_vector) > 100: continue 
 
-                    # A boolean to check if car is inside the 
+                    # A boolean to check if car is inside the bounding box
                     point_on_car = False
                     
                     if detections.xyxy.shape[0] > 0:
@@ -168,7 +170,7 @@ def main():
                                 car_vectors_map[current_id] = []
                             
                             # If there is a point inside the bounding box, apply indication that the point inside the car using car_vectors_map
-                            if x1 < a < x2 and y1 < b < y2:
+                            if x1 <= a <= x2 and y1 <= b <= y2:
                                 """
                                 # DEBUG: Print one example to check the scale
                                 # if i == 0 and len(detections) > 0:
@@ -179,37 +181,44 @@ def main():
                                 #     print(f"-------------------------")
                                 """
 
-                                
-                                """
-                                # car_vectors_map append
-                                # if tracker_id not in car_vectors_map:
-                                #     car_vectors_map[tracker_id] = []
-                                """
                                 car_vectors_map[current_id].append(motion_vector)
                                 point_on_car = True
                                 # mask = cv2.line(mask, (a, b), (c, d), (0, 0, 255), 1)
                                 # Visual: Draw RED dot for car points
                                 cv2.circle(frame, (a, b), 3, (0, 0, 255), -1)
+                                """
                                 # if i == 0 and j == 0: # Only print for the first point and first box to save console space
                                 #     print(f"DEBUG CHECK:")
                                 #     print(f"  Point: {a}, {b} (Type: {type(a)})")
                                 #     print(f"  Box: {x1}, {y1}, {x2}, {y2} (Type: {type(x1)})")
+                                # """
                                 break
                     
-                    # If the point is NOT on a car, it is a regular point placed in the background
+                    # # If the point is NOT on a car, it is a regular point placed in the background
                     if not point_on_car:
                         vector = new - old
                         if vector[1] > 0:
                             background_vectors.append(motion_vector)
                         # mask = cv2.line(mask, (a, b), (c, d), (0, 255, 0), 1) # just to show lines for the point
                         cv2.circle(frame, (a, b), 3, (0, 255, 0), -1)
+                    
+                    # Alternative: If the point is on a car, skip the rest of the loop and don't add it to background_vectors
+                    # if point_on_car:
+                    #     continue # skip the rest of the loop if point is on a car
 
+                    # motion vectors
                     dx = a - c
                     dy = b - d
-                    # if dy < -0.5:
-                    #     continue
+                    """# if dy < -0.5:
+                    #     continue"""
+                    dir_x = a - vanishing_point_x
+                    dir_y = b - vanishing_point_y
+                    dot_product = dx * dir_x + dy * dir_y
 
-                    if abs(dx) > 50 or abs(dy) > 50:
+                    if dot_product <= 0:
+                        continue
+
+                    if abs(dx) > 40 or abs(dy) > 40:
                         continue
 
                     background_vectors.append([dx, dy])
@@ -245,6 +254,7 @@ def main():
                 
                 global_motion_vector = smooth_global
 
+                """
                 # /// DEBUG: Print the entire map for one frame
                 # Only print if we actually have cars detected to avoid spamming empty dicts
                 # if len(detections) > 0:
@@ -262,6 +272,7 @@ def main():
                 # center = (int(frame.shape[1]*0.5), int(frame.shape[0]*0.1))
                 # end_point = (int(center[0] + global_motion_vector[0]*7), int(center[1] + global_motion_vector[1]*7))
                 # cv2.arrowedLine(frame, center, d, (0, 0, 255), 3, tipLength=0.5)
+                # """
                 
             else:
                 p0 = cv2.goodFeaturesToTrack(prev_gray, mask=None, **feature_params)
