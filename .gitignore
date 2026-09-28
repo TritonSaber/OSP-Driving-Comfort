@@ -177,9 +177,14 @@ cython_debug/
 runs/detect/train_large
 runs/detect/train_nano
 runs/detect/train_small
+runs/detect/train_rfdetr
 test
 
 # Large files
 yolo11l.pt
 /videos
 test.py
+
+videos/makati_city_hall.mp4
+
+

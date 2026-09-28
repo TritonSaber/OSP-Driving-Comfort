@@ -1,17 +1,20 @@
-import ultralytics
+# import ultralytics
 import torch
 import os
 
 from roboflow import Roboflow
 from dotenv import load_dotenv
-from ultralytics import YOLO
+from rfdetr import RFDETRMedium
+from pathlib import Path
+from rfdetr.datasets._keypoint_schema import infer_coco_keypoint_schema
+# from ultralytics import YOLO
 
 def main():
     # Load .env
     load_dotenv(".env")
 
     # This checks if ultralytics (and YOLO) is working
-    ultralytics.checks()
+    # ultralytics.checks()
 
     # This checks if CUDA is available
     torch.cuda.is_available()
@@ -20,23 +23,39 @@ def main():
     rf = Roboflow(api_key=os.getenv("ROBOFLOW_API_KEY"))
     project = rf.workspace(os.getenv("ROBOFLOW_WORKSPACE")).project(os.getenv("ROBOFLOW_PROJECT"))
     version = project.version(os.getenv("ROBOFLOW_VERSION"))
-    dataset = version.download(os.getenv("ROBOFLOW_YOLO_VERSION"))
+    dataset = version.download(os.getenv("ROBOFLOW_DATASET_VERSION"))
+
+    DATASET_DIR = Path(dataset.location)
+    # schema = infer_coco_keypoint_schema(DATASET_DIR / "train" / "_annotations.coco.json")
+
+    # model = RFDETR
 
     # Mainly loading YOLO26m for training, alternatively can load YOLO26n and YOLO26s for faster training
     # Originally YOLO11m was used for training, but YOLO26m is the latest version of YOLO and has better performance
-    model = YOLO('yolo26m.pt')
+    model = RFDETRMedium()
 
-    print(model.names)
+    # print(model.names)
 
     # Change data to COCO if needed
     train_results = model.train(
-        data=f'{dataset.location}/data.yaml',
+        dataset_dir=str(DATASET_DIR),
         epochs=100,
-        imgsz=640,
-        batch=8, # batch size reduced from 16 to 8 for VRAM
-        workers=2, # workers reduced from 16 to 4 for RAM
-        device=0
+        batch_size=4,
+        grad_accum_steps=1,
+        lr=1e-4,
+        resume="runs/detect/train_rfdetr/last.ckpt",
+        output_dir="runs/detect/train_rfdetr",
     )
+    """        
+            imgsz=640,
+            batch=8, # batch size reduced from 16 to 8 for VRAM
+            workers=2, # workers reduced from 16 to 4 for RAM
+            device=0
+
+            
+        early_stopping=True,
+        early_stopping_patience=15,
+            """
 
     '''
         NOTES:

@@ -1,12 +1,13 @@
-from collections import defaultdict
-
 import cv2 # OpenCV
+import json
 import numpy as np
 import time
 import supervision as sv
 import torch
 
-from ultralytics import YOLO
+# from ultralytics import YOLO
+from collections import defaultdict
+from rfdetr import RFDETRMedium
 
 def main():
     # Input video title (within path)
@@ -22,9 +23,12 @@ def main():
 
     print("Playing: " + video_path)
 
-    # Best model training run weights
-    # train3 houses YOLO26 trained data
-    model = YOLO("runs/detect/train3/weights/best.pt")
+    # Load the best RF-DETR checkpoint produced by train_osp.py.
+    model = RFDETRMedium(
+        pretrain_weights="runs/detect/train_rfdetr/checkpoint_best_ema.pth"
+    )
+    with open("runs/detect/train_rfdetr/training_config.json", encoding="utf-8") as config_file:
+        class_names = json.load(config_file)["class_names"]
 
     """
     # model = YOLO("yolo11m.pt")
@@ -45,8 +49,7 @@ def main():
     cap = cv2.VideoCapture(video_path)
 
     if not cap.isOpened():
-        print("Error: Could not open video.")
-        return
+        raise RuntimeError(f"Failed to open video: {video_path}")
     
     # Optical Flow setup, using Lucas-Kanade Optical Flow, meaning this is sparse, not dense
     # ShiTomasi corner detection parameters
@@ -86,10 +89,8 @@ def main():
             # If there are no more frames (video has ended)
             break
         
-        result = model(frame, verbose=False)[0]
-
-        # Load in predictions to Supervision, specifically Ultralytics because inference model comes from there
-        detections = sv.Detections.from_ultralytics(result)
+        # RF-DETR already returns a supervision.Detections object.
+        detections = model.predict(frame, threshold=0.3)
 
         # Load in detection result to ByteTrack
         detections = tracker.update_with_detections(detections)
@@ -304,6 +305,7 @@ def main():
                         status = "ACTIVE"
                     else:
                         status = "STOPPED"
+                    mov_track = current_score
                 else:
                     # avg_car_vector via the median
                     avg_car_vector = np.median(my_vectors, axis=0)
@@ -319,7 +321,7 @@ def main():
                     global_speed_y = abs(global_motion_vector[1])
                     magnitude_diff = np.linalg.norm(diff_vector)
                     temp_class_id = detections.class_id[i]
-                    temp_class_name = model.names[temp_class_id]
+                    temp_class_name = class_names[temp_class_id]
                     
                     # dynamic threshold - allowing more leeway if 
                     global_speed = np.linalg.norm(global_motion_vector)
@@ -395,19 +397,14 @@ def main():
                         # print(f"Diff Y: {diff_vector_y:.2f} (Thresh: {threshold_y:.2f}) -> Moving? {is_moving_y}")
                         # print(f"Diff X: {diff_vector_x:.2f} (Thresh: {threshold_x:.2f}) -> Moving? {is_moving_x}")
                     """
-                        
-            for i in range(detections.xyxy.shape[0]):
-                conf = detections.confidence[i]
+
                 class_id = detections.class_id[i]
-                class_name = model.names[class_id]
-                detect_id = detections.tracker_id[i]
-
-                print(f"ID: {detect_id} | Points: {len(my_vectors)} | Diff: {magnitude_diff:.2f} | Thresh: {threshold:.2f}")
-                
-                # final label - class name, confidence for box, status (STOPPED, ACTIVE, etc.), car consistency (TEMPORARY)
-                final_label = f"{detect_id} {class_name} {conf:.2f} {status} {mov_track}"
-                status_labels.append(final_label)
-
+                class_name = class_names[class_id]
+                conf = detections.confidence[i]
+                status_labels.append(
+                    f"{current_id} {class_name} {conf:.2f} {status} {mov_track}"
+                )
+                        
             annotated_frame = box_annotator.annotate(
                 scene=frame.copy(),
                 detections=detections
