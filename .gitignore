@@ -178,6 +178,7 @@ runs/detect/train_large
 runs/detect/train_nano
 runs/detect/train_small
 runs/detect/train_rfdetr
+runs/detect/train_rfdetr_small
 test
 
 # Large files
@@ -188,3 +189,4 @@ test.py
 videos/makati_city_hall.mp4
 
 
+*.mp4

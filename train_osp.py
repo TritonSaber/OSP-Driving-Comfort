@@ -4,10 +4,10 @@ import os
 
 from roboflow import Roboflow
 from dotenv import load_dotenv
-from rfdetr import RFDETRMedium
 from pathlib import Path
 from rfdetr.datasets._keypoint_schema import infer_coco_keypoint_schema
-# from ultralytics import YOLO
+
+from rfdetr import RFDETRMedium, RFDETRSmall, RFDETRNano
 
 def main():
     # Load .env
@@ -30,32 +30,33 @@ def main():
 
     # model = RFDETR
 
-    # Mainly loading YOLO26m for training, alternatively can load YOLO26n and YOLO26s for faster training
-    # Originally YOLO11m was used for training, but YOLO26m is the latest version of YOLO and has better performance
+    # Mainly loading RFDETR Medium for training, alternatively can load nano or small for faster training
+    # Originally YOLO11m was used for training, but RF-DETR has better performance
     model = RFDETRMedium()
 
     # print(model.names)
 
     # Change data to COCO if needed
+
+    """
+
+    ***SETTINGS:***
+    - model: main model used is RFDETRMedium(), change to RFDETRNano() or RFDETRSmall() for faster training, but lower accuracy
+    - resume: add "resume=runs/detect/[output folder]/last.ckpt" to resume training from last checkpoint
+    - output_dir: change output directory to "runs/detect/[output folder]" depending on where you want to save the output
+    - early_stopping: set to True to enable early stopping, set to False to disable early stopping, halts training if 
+    validation loss does not improve for a number of epochs
+    - early_stopping_patience: set to the number of epochs to wait for early stopping, default is 15
+
+    """
     train_results = model.train(
         dataset_dir=str(DATASET_DIR),
         epochs=100,
         batch_size=4,
         grad_accum_steps=1,
         lr=1e-4,
-        resume="runs/detect/train_rfdetr/last.ckpt",
-        output_dir="runs/detect/train_rfdetr",
+        output_dir="runs/detect/train_rfdetr", 
     )
-    """        
-            imgsz=640,
-            batch=8, # batch size reduced from 16 to 8 for VRAM
-            workers=2, # workers reduced from 16 to 4 for RAM
-            device=0
-
-            
-        early_stopping=True,
-        early_stopping_patience=15,
-            """
 
     '''
         NOTES:

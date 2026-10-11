@@ -27,12 +27,14 @@ def main():
     model = RFDETRMedium(
         pretrain_weights="runs/detect/train_rfdetr/checkpoint_best_ema.pth"
     )
-    with open("runs/detect/train_rfdetr/training_config.json", encoding="utf-8") as config_file:
-        class_names = json.load(config_file)["class_names"]
-
-    """
-    # model = YOLO("yolo11m.pt")
-    """
+    with open(
+        "(No-Peds)-Driving-Comfort-Detection-1/train/_annotations.coco.json",
+        encoding="utf-8",
+    ) as annotations_file:
+        categories = json.load(annotations_file)["categories"]
+    class_names = {
+        category["id"]: category["name"] for category in categories
+    }
 
     video_info = sv.VideoInfo.from_video_path(video_path)
     tracker = sv.ByteTrack(frame_rate=video_info.fps)
