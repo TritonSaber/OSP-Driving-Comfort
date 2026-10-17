@@ -8,6 +8,7 @@ import torch
 # from ultralytics import YOLO
 from collections import defaultdict
 from rfdetr import RFDETRMedium
+from trackers import ByteTrackTracker # Updated ByteTrack import
 
 def main():
     # Input video title (within path)
@@ -25,20 +26,27 @@ def main():
 
     # Load the best RF-DETR checkpoint produced by train_osp.py.
     model = RFDETRMedium(
-        pretrain_weights="runs/detect/train_rfdetr/checkpoint_best_ema.pth"
+        pretrain_weights="runs/detect/train_rfdetr/checkpoint_best_ema.pth",
+        num_classes=7,
     )
     with open(
         "(No-Peds)-Driving-Comfort-Detection-1/train/_annotations.coco.json",
         encoding="utf-8",
     ) as annotations_file:
         categories = json.load(annotations_file)["categories"]
+    # COCO category IDs in this export start at 1, while RF-DETR class IDs
+    # are zero-based. The ID 0 entry is the dataset's aggregate supercategory.
+    categories = sorted(
+        (category for category in categories if category["id"] != 0),
+        key=lambda category: category["id"],
+    )
     class_names = {
-        category["id"]: category["name"] for category in categories
+        class_id: category["name"]
+        for class_id, category in enumerate(categories)
     }
 
     video_info = sv.VideoInfo.from_video_path(video_path)
-    tracker = sv.ByteTrack(frame_rate=video_info.fps)
-    smoother = sv.DetectionsSmoother()
+    tracker = ByteTrackTracker(frame_rate=video_info.fps)
 
     # Bounding box annotation
     box_annotator = sv.BoxAnnotator(
@@ -95,8 +103,7 @@ def main():
         detections = model.predict(frame, threshold=0.3)
 
         # Load in detection result to ByteTrack
-        detections = tracker.update_with_detections(detections)
-        detections = smoother.update_with_detections(detections)
+        detections = tracker.update(detections)
 
         # Filter that removes frames without tracker ID
         if detections.tracker_id.any():
@@ -307,7 +314,7 @@ def main():
                         status = "ACTIVE"
                     else:
                         status = "STOPPED"
-                    mov_track = current_score
+                    # mov_track = current_score
                 else:
                     # avg_car_vector via the median
                     avg_car_vector = np.median(my_vectors, axis=0)
